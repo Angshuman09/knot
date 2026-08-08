@@ -1,1 +1,3 @@
-distributed event sourced ledger with single leader replication
+# KNOT
+
+knot is a distributed event sourced ledger engine with single leader replication
