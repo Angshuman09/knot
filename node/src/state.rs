@@ -1,36 +1,37 @@
-use std::collections::HashMap;
 use common::{Cents, Event};
+use std::collections::HashMap;
 
 #[derive(Debug, Default)]
-pub struct StateMachine{
-    balalnce: HashMap<String, Cents>
+pub struct StateMachine {
+    balance: HashMap<String, Cents>,
 }
 
-impl StateMachine{
-    pub fn new() -> Self{
-        Self{
-            balalnce: HashMap::new()
+impl StateMachine {
+    pub fn new() -> Self {
+        Self {
+            balance: HashMap::new(),
         }
     }
 
-    pub fn apply(&mut self, event: &Event){
-        match event{
-            Event::Deposite { account, amount }=>{
-                *self.balalnce.entry(account.clone()).or_insert(0) += amount;
+    pub fn apply(&mut self, event: &Event) {
+        match event {
+            Event::Deposite { account, amount } => {
+                *self.balance.entry(account.clone()).or_insert(0) += amount;
             }
-            Event::Withdraw { account, amount }=>{
-                *self.balalnce.entry(account.clone()).or_insert(0) -= amount;
+            Event::Withdraw { account, amount } => {
+                *self.balance.entry(account.clone()).or_insert(0) -= amount;
             }
-            Event::TransferDebit { from, amount, .. }=>{
-                *self.balalnce.entry(from.clone()).or_insert(0) -= amount;
+            Event::TransferDebit { from, amount, .. } => {
+                *self.balance.entry(from.clone()).or_insert(0) -= amount;
             }
-            Event::TransferCredit { to, amount, .. }=>{
-                *self.balalnce.entry(to.clone()).or_insert(0) += amount;
+            Event::TransferCredit { to, amount, .. } => {
+                *self.balance.entry(to.clone()).or_insert(0) += amount;
             }
         }
     }
 
-    pub fn balance(&self, acccount: &str) -> Cents{
-        *self.balalnce.get(acccount).unwrap_or(&0)
+    pub fn balance(&self, acccount: &str) -> Cents {
+        *self.balance.get(acccount).unwrap_or(&0)
     }
 }
+

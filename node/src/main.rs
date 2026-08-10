@@ -1,8 +1,11 @@
-
 mod log;
 mod state;
-use std::collections::HashMap;
+use common::Event;
+use log::AppendOnlyLog;
 fn main() {
-    let mut value: HashMap<String,  u16> = HashMap::new();
-    let test = value.entry("angshu".to_string()).or_insert(0);
+    let mut log = AppendOnlyLog::new();
+    log.append(Event::Deposite {
+        account: "angshu".to_string(),
+        amount: 500,
+    });
 }

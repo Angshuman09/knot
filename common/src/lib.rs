@@ -1,5 +1,6 @@
 mod event;
 mod protocol;
+mod wire;
 pub use event::Event;
 pub use event::LogEntry;
 pub use event::Cents;
