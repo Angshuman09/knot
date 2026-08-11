@@ -94,7 +94,7 @@ impl Leader{
                 let mut ledger = self.ledger.lock().await;
                 if ledger.state.balance(&account) < amount{
                     return ClientResponse::Error{
-                        message: format!("insufficient funds in {account}")
+                        message: format!("can't withdraw: insufficient balance in {account}")
                     };
                 }
 
@@ -157,6 +157,35 @@ impl Leader{
     }
 
     async fn serve_follower(&self, mut socket: TcpStream) -> std::io::Result<()>{
+        let ReplicationMessage::Subscribe { from_offset } = wire::read_message(&mut socket).await?
+        else{
+            return Ok(());
+        };
+
+        let (backlog, mut live) = {
+            let ledger = self.ledger.lock().await;
+            let backlog: Vec<LogEntry> = ledger.log.entries_after(from_offset).to_vec();
+            (backlog, self.new_entries.subscribe())
+        };
+
+        for entry in backlog {
+            wire::write_message(&mut socket, &ReplicationMessage::Entry(entry)).await?;
+        }
+
+        loop {
+            match live.recv().await{
+                Ok(entry) => {
+                    wire::write_message(&mut socket, &ReplicationMessage::Entry(entry)).await?;
+                }
+                Err(broadcast::error::RecvError::Lagged(skipped)) =>{
+                    eprintln!(
+                        "follower fell too far behind (missed {skipped} entries):
+                        it should reconnect and resubscribe from its last known offset"
+                    );
+                }
+                Err(broadcast::error::RecvError::Closed) => break,
+            }
+        }
         Ok(())
     }
 }
