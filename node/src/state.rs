@@ -15,7 +15,7 @@ impl StateMachine {
 
     pub fn apply(&mut self, event: &Event) {
         match event {
-            Event::Deposite { account, amount } => {
+            Event::Deposit { account, amount } => {
                 *self.balance.entry(account.clone()).or_insert(0) += amount;
             }
             Event::Withdraw { account, amount } => {
@@ -35,3 +35,49 @@ impl StateMachine {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn state_machine_applies_deposit_and_withdraw() {
+        let mut state = StateMachine::new();
+
+        state.apply(&Event::Deposit {
+            account: "alice".into(),
+            amount: 100,
+        });
+
+        state.apply(&Event::Withdraw {
+            account: "alice".into(),
+            amount: 30,
+        });
+
+        assert_eq!(state.balance("alice"), 70);
+    }
+
+    #[test]
+    fn state_machine_applies_transfer() {
+        let mut state = StateMachine::new();
+
+        state.apply(&Event::Deposit {
+            account: "alice".into(),
+            amount: 100,
+        });
+
+        state.apply(&Event::TransferDebit {
+            transfer_id: 1,
+            from: "alice".into(),
+            amount: 40,
+        });
+
+        state.apply(&Event::TransferCredit {
+            transfer_id: 1,
+            to: "bob".into(),
+            amount: 40,
+        });
+
+        assert_eq!(state.balance("alice"), 60);
+        assert_eq!(state.balance("bob"), 40);
+    }
+}

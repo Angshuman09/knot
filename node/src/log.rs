@@ -36,3 +36,27 @@ impl AppendOnlyLog{
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn append_assigns_incrementing_offsets() {
+        let mut log = AppendOnlyLog::new();
+
+        let first = log.append(Event::Deposit {
+            account: "alice".into(),
+            amount: 100,
+        });
+
+        let second = log.append(Event::Deposit {
+            account: "bob".into(),
+            amount: 50,
+        });
+
+        assert_eq!(first.offset, 1);
+        assert_eq!(second.offset, 2);
+        assert_eq!(log.last_offset(), 2);
+    }
+}

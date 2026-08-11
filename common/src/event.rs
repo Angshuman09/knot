@@ -4,7 +4,7 @@ pub type Cents = i64;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Event{
-    Deposite {account: String, amount: Cents },
+    Deposit {account: String, amount: Cents },
     Withdraw{account: String, amount: Cents},
     TransferDebit{transfer_id: u64, from: String, amount: Cents},
     TransferCredit{transfer_id: u64, to: String, amount: Cents}

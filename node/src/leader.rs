@@ -88,7 +88,7 @@ impl Leader{
     async fn handle_request(&self, request:ClientRequest) -> ClientResponse{
         match request{
             ClientRequest::Deposite { account, amount }=>{
-                self.commit(Event::Deposite { account, amount }).await
+                self.commit(Event::Deposit { account, amount }).await
             }
             ClientRequest::Withdraw { account, amount }=>{
                 let mut ledger = self.ledger.lock().await;
