@@ -1,6 +1,8 @@
 mod leader;
 mod log;
 mod state;
+mod follower;
+mod ledger;
 use common::Event;
 use log::AppendOnlyLog;
 use common::wire::{read_message, write_message};

@@ -9,12 +9,8 @@ use common::{
 
 use crate::log::AppendOnlyLog;
 use crate::state::StateMachine;
+use crate::ledger::Ledger;
 
-
-struct Ledger{
-    log: AppendOnlyLog,
-    state: StateMachine
-}
 
 #[derive(Clone)]
 pub struct Leader{
@@ -83,7 +79,6 @@ impl Leader{
             wire::write_message(&mut socket, &response).await?;
         }
     }
-
 
     async fn handle_request(&self, request:ClientRequest) -> ClientResponse{
         match request{

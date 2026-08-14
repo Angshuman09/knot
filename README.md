@@ -1,4 +1,4 @@
-# KNOT
+# Knot
 
 Knot is a distributed event-sourced ledger engine built in Rust.
 
@@ -8,7 +8,7 @@ The ledger supports deposits, withdrawals, transfers, and balance queries, with 
 
 ## Architecture
 
-![architecture overview](assets/architecture.png)
+![architecture overview](assets/planediagram.png)
 
 Single-leader replication, logical (row-based) log shipping:
 
@@ -35,12 +35,12 @@ Full wire protocol and message formats: see `SPEC.md`.
   once `follower.rs` exists.
 - `StateMachine::apply` never rejects an event. Validation (e.g.
   insufficient funds) happens once, on the leader, before an event is
-  appended - once something is in the log, every replica is obligated to
+  appended, once something is in the log, every replica is obligated to
   apply it identically, or replicas would diverge.
 
 ## References: 
 
-- **Designing Data-Intensive Applications** — Martin Kleppmann
+- **Designing Data-Intensive Applications** by Martin Kleppmann
   - Chapter 5: Replication
 - [Event Sourcing Blog](https://martinfowler.com/eaaDev/EventSourcing.html)
 - [Replication Blog](https://arpitbhayani.me/blogs/read-your-write-consistency/)
