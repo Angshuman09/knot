@@ -61,4 +61,30 @@ impl Follower {
         }
     }
 
+    pub async fn balance(&self, account: &str, read_after: Option<u64>) -> ClientResponse{
+        if let Some(needed) = read_after{
+            loop{
+                {
+                    let ledger = self.ledger.lock().await;
+                    if ledger.log.last_offset() >= needed{
+                        break;
+                    }
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        }
+
+        let ledger = self.ledger.lock().await;
+        ClientResponse::Balance { 
+            amount: ledger.state.balance(account), 
+             as_of_offset: ledger.log.last_offset(),
+             account: account.to_string()
+            }
+    }
+
+    pub fn reject_write(&self) -> ClientResponse{
+        ClientResponse::NotLeader { 
+            leader_addr: Some(self.leader_client_addr.clone())
+         }
+    }
 }
