@@ -13,7 +13,7 @@ pub enum ClientRequest{
 pub enum ClientResponse{
     WriteAck {offset: u64},
     Balance{account: String, amount: Cents, as_of_offset: u64},
-    NotLeader {leader_addr: Option<String>},
+    NotLeader {leader_addr: Option<String>}, 
     Error{message: String}
 }
 

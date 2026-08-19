@@ -143,7 +143,7 @@ impl RequestHandler for Leader {
                     };
                 }
 
-                let tranfer_id = ledger.log.last_offset() + 1;
+                let transfer_id = ledger.log.last_offset() + 1;
                 let debit = ledger.append(Event::TransferDebit {
                     transfer_id,
                     from,
@@ -171,9 +171,9 @@ impl RequestHandler for Leader {
             } => {
                 let ledger = self.ledger.lock().await;
                 ClientResponse::Balance {
-                    account,
                     amount: ledger.state.balance(&account),
                     as_of_offset: ledger.log.last_offset(),
+                    account
                 }
             }
         }
