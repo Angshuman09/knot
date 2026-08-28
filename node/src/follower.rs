@@ -48,7 +48,7 @@ impl Follower {
         let replication_follower = self.clone();
         let leader_addr = leader_follower_addr.to_string();
         let replication = tokio::spawn(async move{
-            
+            replication_follower.replicate_forever(&leader_addr).await;
         });
 
         let _ = tokio::join!(clients, replication);
