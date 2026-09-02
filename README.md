@@ -20,98 +20,8 @@ Single-leader replication, logical (row-based) log shipping:
 
 Full wire protocol and message formats: see `SPEC.md`.
 
-## Architecture & Data Flow
 
-### Architecture Diagram
-
-```mermaid
-flowchart TB
-    subgraph Clients["Clients"]
-        CLI_Write["Client (Write CLI)<br/>deposit / withdraw / transfer"]
-        CLI_Read["Client (Read CLI)<br/>balance [--read-after]"]
-    end
-
-    subgraph LeaderNode["Leader Node (127.0.0.1)"]
-        direction TB
-        L_ClientPort["Client Listener<br/>:9000"]
-        L_FollowerPort["Follower Listener<br/>:9001"]
-        
-        L_Handler["Client Request Handler"]
-        L_Bcast["tokio::sync::broadcast<br/>new_entries channel"]
-
-        subgraph L_Ledger["Leader Ledger"]
-            L_Log["AppendOnlyLog<br/>offset: 1, 2, 3..."]
-            L_State["StateMachine<br/>HashMap(Account, Cents)"]
-        end
-
-        L_ClientPort --> L_Handler
-        L_Handler -->|Append & Apply| L_Ledger
-        L_Handler -->|Publish entry| L_Bcast
-        L_Bcast -->|Stream live entries| L_FollowerPort
-        L_Log -.->|Backlog stream on subscribe| L_FollowerPort
-    end
-
-    subgraph FollowerNode["Follower Node (127.0.0.1)"]
-        direction TB
-        F_ClientPort["Client Listener<br/>:9010"]
-        F_Handler["Client Request Handler"]
-        F_ReplTask["Replication Task<br/>replicate_forever()"]
-
-        subgraph F_Ledger["Follower Ledger"]
-            F_Log["AppendOnlyLog<br/>Replicated Log"]
-            F_State["StateMachine<br/>Replicated Balances"]
-        end
-
-        F_ClientPort --> F_Handler
-        F_Handler -->|Read Balance<br/>Wait if read_after > offset| F_Ledger
-        F_Handler -.->|Reject Writes<br/>NotLeader| F_ClientPort
-        F_ReplTask -->|Apply replicated entry| F_Ledger
-    end
-
-    CLI_Write -->|"TCP Writes"| L_ClientPort
-    L_ClientPort -->|"WriteAck { offset }"| CLI_Write
-
-    CLI_Read -->|"TCP Reads"| F_ClientPort
-    F_ClientPort -->|"Balance { amount, offset }"| CLI_Read
-
-    F_ReplTask -->|"Subscribe { from_offset }"| L_FollowerPort
-    L_FollowerPort -->|"Stream LogEntry"| F_ReplTask
-```
-
-### Sequence Diagram
-
-```mermaid
-sequenceDiagram
-    autonumber
-
-    actor Client
-    participant L as Leader (:9000)
-    participant LL as Leader Ledger
-    participant F as Follower (:9010)
-    participant FL as Follower Ledger
-
-    Note over F,L: Background Replication Setup
-    F->>L: Connect to :9001 and Subscribe from offset 0
-
-    Note over Client,L: 1. Write Path
-    Client->>L: Deposit alice $50
-    L->>LL: Append event
-    LL->>LL: Apply event to StateMachine
-    L-->>Client: WriteAck offset 1
-
-    Note over L,F: 2. Replication
-    L->>F: Replicate LogEntry offset 1
-    F->>FL: Append entry and apply event
-
-    Note over Client,F: 3. Read Path
-    Client->>F: GetBalance alice, read_after 1
-    Note over F: Wait until local offset >= 1
-    F->>FL: Read alice balance
-    FL-->>F: $50.00
-    F-->>Client: Balance $50.00, offset 1
-```
-
-## Design notes
+## design notes
 
 - Amounts are `i64` cents, never floating point.
 - Log offsets are 1-based. Offset 0 means "nothing applied yet" and is
@@ -126,13 +36,111 @@ sequenceDiagram
   appended, once something is in the log, every replica is obligated to
   apply it identically, or replicas would diverge.
 
-## References: 
+## run it
+
+### Start the Nodes
+Open two terminal windows (or use scripts/start.sh):
+
+Terminal-1 **Leader Node**:
+
+```sh
+cargo run -p node -- leader \
+  --client-addr 127.0.0.1:9000 \
+  --follower-addr 127.0.0.1:9001
+```
+
+Terminal-2 **Follower Node** (replicates in real-time):
+
+```sh
+cargo run -p node -- follower \
+  --client-addr 127.0.0.1:9010 \
+  --leader-client-addr 127.0.0.1:9000 \
+  --leader-follower-addr 127.0.0.1:9001
+```
+
+### Test Operations with the Client CLI
+You can use (or use scripts/client.sh):
+
+1. **Deposit**
+
+Deposit funds into accounts on the leader:
+
+```sh
+# Deposit $100.00 into alice
+cargo run -p client -- 127.0.0.1:9000 deposit alice 100.00
+# Output: ok, committed at offset 1
+```
+```sh
+# Deposit $50.00 into bob
+cargo run -p client -- 127.0.0.1:9000 deposit bob 50.00
+# Output: ok, committed at offset 2
+```
+
+2. **Withdraw**
+Withdraw funds from an account (with balance check):
+```sh
+# Successful withdrawal
+cargo run -p client -- 127.0.0.1:9000 withdraw alice 25.00
+# Output: ok, committed at offset 3
+
+# Insufficient funds check (alice now has $75.00)
+cargo run -p client -- 127.0.0.1:9000 withdraw alice 200.00
+# Output: error: insufficinet funds in alice
+```
+
+3. **Transfer**
+Transfer funds between two accounts (generates two paired events: TransferDebit and TransferCredit):
+```sh
+# Transfer $30.00 from alice to bob
+cargo run -p client -- 127.0.0.1:9000 transfer alice bob 30.00
+# Output: ok, committed at offset 5 (offset 4 was Debit, offset 5 was Credit)
+
+# Insufficient funds transfer attempt
+cargo run -p client -- 127.0.0.1:9000 transfer alice bob 500.00
+# Output: error: insufficient funds in alice
+```
+
+4. **Check Balance** (Read Path & Replication Verification)
+Read directly from the Leader (:9000):
+```sh
+cargo run -p client -- 127.0.0.1:9000 balance alice
+# Output: alice: $45.00 (as of offset 5)
+
+cargo run -p client -- 127.0.0.1:9000 balance bob
+# Output: bob: $80.00 (as of offset 5)
+```
+
+Read from the Follower (:9010) to verify replication:
+```sh
+cargo run -p client -- 127.0.0.1:9010 balance alice
+# Output: alice: $45.00 (as of offset 5)
+```
+
+5. **Test Read-Your-Own-Writes Consistency** (--read-after)
+
+You can ask the follower to ensure it has synced up to at least a specific offset before returning the balance:
+```sh
+cargo run -p client -- 127.0.0.1:9010 balance alice --read-after 5
+# Output: alice: $45.00 (as of offset 5)
+```
+
+6.  Test Single-Leader Write Rejection
+If a client attempts to send a write directly to a follower:
+```sh
+cargo run -p client -- 127.0.0.1:9010 deposit alice 10.00
+# Output: not the leader — writes go to 127.0.0.1:9000
+```
+
+## architecture & data flow
+[ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
+## references: 
 
 - **Designing Data-Intensive Applications** by Martin Kleppmann
   - Chapter 5: Replication
 - [Event Sourcing Blog](https://martinfowler.com/eaaDev/EventSourcing.html)
 - [Replication Blog](https://arpitbhayani.me/blogs/read-your-write-consistency/)
 
-## License
+## license
 
 MIT. See `LICENSE`.
