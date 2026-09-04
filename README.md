@@ -136,10 +136,9 @@ cargo run -p client -- 127.0.0.1:9010 deposit alice 10.00
 
 ## references: 
 
-- **Designing Data-Intensive Applications** by Martin Kleppmann
-  - Chapter 5: Replication
-- [Event Sourcing Blog](https://martinfowler.com/eaaDev/EventSourcing.html)
-- [Replication Blog](https://arpitbhayani.me/blogs/read-your-write-consistency/)
+- Chapter-5(Replication) of **Designing Data-Intensive Applications** by Martin Kleppmann
+- [Event Sourcing Blog by Martin Fowler](https://martinfowler.com/eaaDev/EventSourcing.html)
+- [Replication Blog by Arpit Bhayani](https://arpitbhayani.me/blogs/read-your-write-consistency/)
 
 ## license
 

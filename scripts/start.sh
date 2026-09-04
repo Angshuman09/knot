@@ -1,21 +1,17 @@
 #!/bin/bash
 
-echo "Starting Knot leader..."
-cargo run -p node -- leader \
-  --client-addr 127.0.0.1:9000 \
-  --follower-addr 127.0.0.1:9001 &
+trap 'kill $(jobs -p) 2>/dev/null; exit 0' SIGINT SIGTERM EXIT
 
+echo "Starting Knot leader..."
+cargo run -q -p node -- leader &
 LEADER_PID=$!
 
 echo "Starting Knot follower..."
-cargo run -p node -- follower \
-  --client-addr 127.0.0.1:9010 \
-  --leader-client-addr 127.0.0.1:9000 \
-  --leader-follower-addr 127.0.0.1:9001 &
-
+cargo run -q -p node -- follower &
 FOLLOWER_PID=$!
 
 echo "Leader PID: $LEADER_PID"
 echo "Follower PID: $FOLLOWER_PID"
+echo "Press Ctrl+C to stop all nodes."
 
 wait
