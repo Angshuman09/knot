@@ -5,8 +5,6 @@ use tokio::sync::{Mutex, broadcast};
 
 use crate::client_handler::{self, RequestHandler};
 use crate::ledger::Ledger;
-use crate::log::AppendOnlyLog;
-use crate::state::StateMachine;
 use common::{ClientRequest, ClientResponse, Event, LogEntry, ReplicationMessage, wire};
 
 #[derive(Clone)]
@@ -16,15 +14,18 @@ pub struct Leader {
 }
 
 impl Leader {
-    pub fn new() -> Self {
-        let (new_entries, _unused_reciever) = broadcast::channel(1024);
-        Self {
-            ledger: Arc::new(Mutex::new(Ledger {
-                log: AppendOnlyLog::new(),
-                state: StateMachine::new(),
-            })),
+    pub fn open(data_dir: &str) -> std::io::Result<Self> {
+        let (new_entries, _unused_receiver) = broadcast::channel(1024);
+        let ledger = Ledger::open(data_dir)?;
+
+        println!(
+            "leader: loaded {} entries from WAL ({data_dir})",
+            ledger.log.last_offset()
+        );
+        Ok(Self {
+            ledger: Arc::new(Mutex::new(ledger)),
             new_entries,
-        }
+        })
     }
 
     pub async fn run(self, client_addr: &str, follower_addr: &str) -> std::io::Result<()> {
@@ -72,11 +73,17 @@ impl Leader {
 
     async fn commit(&self, event: Event) -> ClientResponse {
         let mut ledger = self.ledger.lock().await;
-        let entry = ledger.append(event);
-        drop(ledger);
-        let _ = self.new_entries.send(entry.clone());
-        ClientResponse::WriteAck {
-            offset: entry.offset,
+        match ledger.append(event) {
+            Ok(entry) => {
+                drop(ledger);
+                let _ = self.new_entries.send(entry.clone());
+                ClientResponse::WriteAck {
+                    offset: entry.offset,
+                }
+            }
+            Err(e) => ClientResponse::Error {
+                message: format!("WAL write error: {e}"),
+            },
         }
     }
 
@@ -128,11 +135,17 @@ impl RequestHandler for Leader {
                     };
                 }
 
-                let entry = ledger.append(Event::Withdraw { account, amount });
-                drop(ledger);
-                let _ = self.new_entries.send(entry.clone());
-                ClientResponse::WriteAck {
-                    offset: entry.offset,
+                match ledger.append(Event::Withdraw { account, amount }) {
+                    Ok(entry) => {
+                        drop(ledger);
+                        let _ = self.new_entries.send(entry.clone());
+                        ClientResponse::WriteAck {
+                            offset: entry.offset,
+                        }
+                    }
+                    Err(e) => ClientResponse::Error {
+                        message: format!("WAL write error during withdraw: {e}"),
+                    },
                 }
             }
             ClientRequest::Transfer { from, to, amount } => {
@@ -144,24 +157,30 @@ impl RequestHandler for Leader {
                 }
 
                 let transfer_id = ledger.log.last_offset() + 1;
-                let debit = ledger.append(Event::TransferDebit {
+                let debit_res = ledger.append(Event::TransferDebit {
                     transfer_id,
                     from,
                     amount,
                 });
 
-                let credit = ledger.append(Event::TransferCredit {
+                let credit_res = ledger.append(Event::TransferCredit {
                     transfer_id,
                     to,
                     amount,
                 });
 
-                drop(ledger);
-
-                let _ = self.new_entries.send(debit);
-                let _ = self.new_entries.send(credit.clone());
-                ClientResponse::WriteAck {
-                    offset: credit.offset,
+                match (debit_res, credit_res) {
+                    (Ok(debit), Ok(credit)) => {
+                        drop(ledger);
+                        let _ = self.new_entries.send(debit);
+                        let _ = self.new_entries.send(credit.clone());
+                        ClientResponse::WriteAck {
+                            offset: credit.offset,
+                        }
+                    }
+                    _ => ClientResponse::Error { 
+                        message: "WAL write error during transfer".to_string()
+                    }
                 }
             }
 
@@ -173,7 +192,7 @@ impl RequestHandler for Leader {
                 ClientResponse::Balance {
                     amount: ledger.state.balance(&account),
                     as_of_offset: ledger.log.last_offset(),
-                    account
+                    account,
                 }
             }
         }

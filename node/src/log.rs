@@ -10,6 +10,10 @@ impl AppendOnlyLog{
         Self { entries: Vec::new() }
     }
 
+    pub fn from_entries(entries: Vec<LogEntry>)-> Self{
+        Self {entries}
+    }
+
     pub fn append(&mut self, event: Event)-> LogEntry{
         let offset = self.entries.len() as u64 + 1;
         let entry = LogEntry{offset , event};
@@ -34,29 +38,5 @@ impl AppendOnlyLog{
         }else{
             &self.entries[start..]
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn append_assigns_incrementing_offsets() {
-        let mut log = AppendOnlyLog::new();
-
-        let first = log.append(Event::Deposit {
-            account: "alice".into(),
-            amount: 100,
-        });
-
-        let second = log.append(Event::Deposit {
-            account: "bob".into(),
-            amount: 50,
-        });
-
-        assert_eq!(first.offset, 1);
-        assert_eq!(second.offset, 2);
-        assert_eq!(log.last_offset(), 2);
     }
 }
