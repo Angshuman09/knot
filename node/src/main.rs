@@ -16,18 +16,6 @@ fn arg_value(args: &[String], flag: &str) -> Option<String> {
         .cloned()
 }
 
-fn print_usage() {
-    eprintln!(
-        "usage:\n\
-         \x20 node leader   [--data-dir <dir>] --client-addr <addr> --follower-addr <addr>\n\
-         \x20 node follower [--data-dir <dir>] --client-addr <addr> --leader-client-addr <addr> --leader-follower-addr <addr>\n\
-         \n\
-         example (run in separate terminals):\n\
-         \x20 node leader   --data-dir data/leader --client-addr 127.0.0.1:9000 --follower-addr 127.0.0.1:9001\n\
-         \x20 node follower --data-dir data/follower --client-addr 127.0.0.1:9010 --leader-client-addr 127.0.0.1:9000 --leader-follower-addr 127.0.0.1:9001"
-    );
-}
-
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -52,15 +40,9 @@ async fn main() -> std::io::Result<()> {
             let data_dir = arg_value(&args, "--data-dir").unwrap_or_else(|| "data/follower".to_string());
             let client_addr = arg_value(&args, "--client-addr").unwrap_or_else(|| "127.0.0.1:9010".to_string());
 
-            let Some(leader_client_addr) = arg_value(&args, "--leader-client-addr") else {
-                print_usage();
-                return Ok(());
-            };
+            let leader_client_addr = arg_value(&args, "--leader-client-addr").unwrap_or_else(|| "127.0.0.1:9000".to_string());
 
-            let Some(leader_follower_addr) = arg_value(&args, "--leader-follower-addr") else {
-                print_usage();
-                return Ok(());
-            };
+            let leader_follower_addr = arg_value(&args, "--leader-follower-addr").unwrap_or_else(|| "127.0.0.1:9001".to_string());
 
             Follower::open(&data_dir, leader_client_addr)?
                 .run(&client_addr, &leader_follower_addr)
@@ -68,7 +50,7 @@ async fn main() -> std::io::Result<()> {
         }
 
         _ => {
-            print_usage();
+            eprintln!("usage: node <leader|follower>");
             Ok(())
         }
     }

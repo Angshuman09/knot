@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Kill all background child processes when script is exited or interrupted
 trap 'kill $(jobs -p) 2>/dev/null; exit 0' SIGINT SIGTERM EXIT
 
 echo "Starting Knot leader..."

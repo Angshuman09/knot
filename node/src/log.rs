@@ -1,4 +1,4 @@
-use common::{Event, LogEntry};
+use common::{LogEntry};
 
 #[derive(Debug, Default)]
 pub struct AppendOnlyLog{
@@ -12,13 +12,6 @@ impl AppendOnlyLog{
 
     pub fn from_entries(entries: Vec<LogEntry>)-> Self{
         Self {entries}
-    }
-
-    pub fn append(&mut self, event: Event)-> LogEntry{
-        let offset = self.entries.len() as u64 + 1;
-        let entry = LogEntry{offset , event};
-        self.entries.push(entry.clone());
-        entry
     }
 
     pub fn append_replicated(&mut self, entry: LogEntry){

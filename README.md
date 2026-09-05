@@ -44,18 +44,13 @@ Open two terminal windows (or use scripts/start.sh):
 Terminal-1 **Leader Node**:
 
 ```sh
-cargo run -p node -- leader \
-  --client-addr 127.0.0.1:9000 \
-  --follower-addr 127.0.0.1:9001
+cargo run -p node -- leader
 ```
 
 Terminal-2 **Follower Node** (replicates in real-time):
 
 ```sh
-cargo run -p node -- follower \
-  --client-addr 127.0.0.1:9010 \
-  --leader-client-addr 127.0.0.1:9000 \
-  --leader-follower-addr 127.0.0.1:9001
+cargo run -p node -- follower 
 ```
 
 ### Test Operations with the Client CLI
@@ -67,12 +62,12 @@ Deposit funds into accounts on the leader:
 
 ```sh
 # Deposit $100.00 into alice
-cargo run -p client -- 127.0.0.1:9000 deposit alice 100.00
+cargo run -p client -- deposit alice 100.00
 # Output: ok, committed at offset 1
 ```
 ```sh
 # Deposit $50.00 into bob
-cargo run -p client -- 127.0.0.1:9000 deposit bob 50.00
+cargo run -p client -- deposit bob 50.00
 # Output: ok, committed at offset 2
 ```
 
@@ -80,11 +75,11 @@ cargo run -p client -- 127.0.0.1:9000 deposit bob 50.00
 Withdraw funds from an account (with balance check):
 ```sh
 # Successful withdrawal
-cargo run -p client -- 127.0.0.1:9000 withdraw alice 25.00
+cargo run -p client -- withdraw alice 25.00
 # Output: ok, committed at offset 3
 
 # Insufficient funds check (alice now has $75.00)
-cargo run -p client -- 127.0.0.1:9000 withdraw alice 200.00
+cargo run -p client -- withdraw alice 200.00
 # Output: error: insufficinet funds in alice
 ```
 
@@ -92,21 +87,21 @@ cargo run -p client -- 127.0.0.1:9000 withdraw alice 200.00
 Transfer funds between two accounts (generates two paired events: TransferDebit and TransferCredit):
 ```sh
 # Transfer $30.00 from alice to bob
-cargo run -p client -- 127.0.0.1:9000 transfer alice bob 30.00
+cargo run -p client -- transfer alice bob 30.00
 # Output: ok, committed at offset 5 (offset 4 was Debit, offset 5 was Credit)
 
 # Insufficient funds transfer attempt
-cargo run -p client -- 127.0.0.1:9000 transfer alice bob 500.00
+cargo run -p client -- transfer alice bob 500.00
 # Output: error: insufficient funds in alice
 ```
 
 4. **Check Balance** (Read Path & Replication Verification)
 Read directly from the Leader (:9000):
 ```sh
-cargo run -p client -- 127.0.0.1:9000 balance alice
+cargo run -p client -- balance alice
 # Output: alice: $45.00 (as of offset 5)
 
-cargo run -p client -- 127.0.0.1:9000 balance bob
+cargo run -p client -- balance bob
 # Output: bob: $80.00 (as of offset 5)
 ```
 
